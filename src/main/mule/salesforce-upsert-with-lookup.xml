@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:crypto="http://www.mulesoft.org/schema/mule/crypto"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/crypto http://www.mulesoft.org/schema/mule/crypto/current/mule-crypto.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<flow name="salesforce-upsert-with-lookupFlow-single" doc:id="5fb8cf7d-c2fc-43f5-a111-dfe04bfa860d" >
+		<ee:transform doc:name="Transform Message" doc:id="9422ebac-d270-45b6-a2ef-131ac03a9a2b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	testbulkdependent__r: {
+		Name: "A1"
+	},
+	testorderid__c: "1"
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert objectType="testOrder__c" externalIdFieldName="testorderid__c" doc:name="Upsert" doc:id="f89ce36d-51e8-43bc-a21e-d4e65c6a72c8" config-ref="Salesforce_Config"/>
+		<choice doc:name="Choice" doc:id="8c177096-4b62-4923-afc4-fb4ecede8362" >
+			<when expression="#[payload.items.exception.localizedMessage == null]">
+				<logger level="INFO" doc:name="Success Logger" doc:id="ea66f372-fd12-4239-b855-37c0d5c5e33f" message="#[payload]" />
+			</when>
+		</choice>
+	</flow>
+	<flow name="salesforce-upsert-with-lookupFlow-bulk-v1-limit-10k" doc:id="3811a762-ae37-40e7-8057-2062b1dc2c77" >
+		<salesforce:create-job operation="upsert" type="testOrder__c" doc:name="Create job" doc:id="cf581a60-77fd-4444-af33-269c37adeb93" config-ref="Salesforce_Config" target="createJobResp">
+			<salesforce:create-job-request ><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "externalIdFieldName": "testorderid__c",
+    "contentType" : "JSON",
+    "concurrencyMode": "Parallel"  //Serial or Parallel
+}]]]></salesforce:create-job-request>
+		</salesforce:create-job>
+		<file:read doc:name="Read" doc:id="fef33d7e-d7bc-4a1e-9089-181502de0f30" path="${input.filePath-bulk-upsert-relationship}" />
+		<ee:transform doc:name="Transform Message" doc:id="114a5be1-4080-493f-a739-f62ca90271ff">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+
+payload map() -> {
+	testbulkdependent__r: {
+		Name: $.Name
+	},
+	testorderid__c: $.testorderid__c
+	
+}
+
+//[{
+//	testbulkdependent__r: {
+//		Name: "A1"
+//	},
+//	testorderid__c: "1"
+//}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create-batch doc:name="Create batch" doc:id="e5a05a09-d666-4631-acc9-ffc3ca8eba98" config-ref="Salesforce_Config" jobInfoBatch="#[vars.createJobResp]">
+			<salesforce:objects ><![CDATA[#[output application/json
+---
+payload]]]></salesforce:objects>
+		</salesforce:create-batch>
+		<choice doc:name="Choice" doc:id="65690bcf-e3ad-4b75-9c5e-09062b599f63" >
+			<when expression="#[payload.items.exception.localizedMessage == null]" >
+				<logger level="INFO" doc:name="Success Logger" doc:id="dab2377c-c9fb-430b-9412-b8eabd7bbd13" message="#[payload]" />
+				<salesforce:close-job doc:name="Close job" doc:id="f6aba519-bca0-4e6e-902d-50056df2c434" config-ref="Salesforce_Config" jobId="#[vars.createJobResp.id]"/>
+			</when>
+			<otherwise >
+				<salesforce:close-job doc:name="Close job" doc:id="50db1e1e-23f9-4257-984b-0e9d106c845f" config-ref="Salesforce_Config" jobId="#[vars.createJobResp.id]"/>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="salesforce-upsert-with-lookupFlow-bulkv2" doc:id="20a4cfc2-154b-4bfd-a60c-92e65b3cb633" >
+		<file:read doc:name="Read" doc:id="d76f6b7e-86f3-4702-bac9-72aaa8145d9e" path="${input.filePath-bulkv2-upsert-relationship}" outputMimeType="application/csv; streaming=true"/>
+		<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="d58aeae7-c661-45bc-b920-0ea48bee806d" config-ref="Salesforce_Config" objectType="testOrder__c" operation="upsert" externalIdFieldName="testorderid__c">
+		</salesforce:create-job-bulk-api-v2>
+	</flow>
+	<flow name="salesforce-upsert-with-lookupFlow-bulkv2-withJsonInput" doc:id="03b77012-e9b2-4fcb-b453-c6f35d9e7702" >
+		<file:read doc:name="Read" doc:id="f7f829e9-7703-4e9e-bf18-199202f84b35" path="${input.filePath-bulkv2-upsert-relationship-json}" outputMimeType="application/csv; streaming=true" />
+		<ee:transform doc:name="Transform Message" doc:id="5e27fdde-3fae-4688-a33a-399d76c8132c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+
+payload map() -> {
+	'testbulkdependent__r.Name': $.'testbulkdependent__c',
+	
+	'testorderid__c': $.testorderid__c
+	
+}
+
+//[{
+//	testbulkdependent__r: {
+//		Name: "A1"
+//	},
+//	testorderid__c: "1"
+//}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create-job-bulk-api-v2 objectType="testOrder__c" operation="upsert" doc:name="Create job bulk api v 2" doc:id="39fc92e9-6dc4-4b9b-8987-1bd42e40c812" config-ref="Salesforce_Config" externalIdFieldName="testorderid__c" >
+			<salesforce:s-objects ><![CDATA[#[output application/csv
+---
+payload]]]></salesforce:s-objects>
+		</salesforce:create-job-bulk-api-v2>
+	</flow>
+</mule>

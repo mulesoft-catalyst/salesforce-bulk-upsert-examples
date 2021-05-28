@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<flow name="bulk-v1-load-5k" doc:id="754c67c3-6452-4506-96e7-2bd91de274f3" >
+		<file:read doc:name="Read" doc:id="07329ca4-d19b-4f4a-a0d6-f554e914dc75" path="${input.filePath-5krecords}"/>
+		<ee:transform doc:name="Transform Message" doc:id="d4bf37cb-1af9-4a0a-8e77-a967ad9c73eb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map() -> {
+	integrationname__c: $.integrationname__c,
+	integrationid__c: $.integrationid__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create-job operation="upsert" type="testbulkobject__c" doc:name="Create job" doc:id="ae0e3168-e912-4151-a27f-8627c482db6e" config-ref="Salesforce_Config" target="createJobResp">
+			<salesforce:create-job-request><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "externalIdFieldName": "integrationid__c",
+    "contentType" : "JSON",
+    "concurrencyMode": "Serial"  //Serial or Parallel
+}]]]></salesforce:create-job-request>
+			</salesforce:create-job>
+		<salesforce:create-batch doc:name="Create batch" doc:id="0757b5b0-3fb0-4c48-8dcb-76550f1fbf4b" config-ref="Salesforce_Config" jobInfoBatch="#[vars.createJobResp]"/>
+		<salesforce:close-job doc:name="Close job" doc:id="0250e936-75b1-4069-abfb-2e4fedadfc68" config-ref="Salesforce_Config" jobId="#[vars.createJobResp.id]"/>
+	</flow>
+	<flow name="bulk-v1-load-11k-ParallelProcessing" doc:id="1650dc54-2ae2-437f-ab4d-85bc7b693964" >
+		<file:read doc:name="Read" doc:id="b6997d9d-fb6d-49b6-b21a-36f6acc5dcf3" path="${input.filePath-10krecords}" />
+		<ee:transform doc:name="Transform Message" doc:id="5a46b939-0065-413b-bc10-b83de4c909a5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map() -> {
+	integrationname__c: $.integrationname__c,
+	integrationid__c: $.integrationid__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="5dc25e8d-ce29-4fc6-b0bb-8eb9cc44fa48" batchSize="10000">
+			<salesforce:create-job operation="upsert" type="testbulkobject__c" doc:name="Create job" doc:id="a113da04-ba0b-4351-b039-b5d1e53d3f3a" config-ref="Salesforce_Config" target="createJobResp">
+			<salesforce:create-job-request><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "externalIdFieldName": "integrationid__c",
+    "contentType" : "JSON",
+    "concurrencyMode": "Parallel"  //Serial or Parallel
+}]]]></salesforce:create-job-request>
+		</salesforce:create-job>
+			<salesforce:create-batch doc:name="Create batch" doc:id="47fdefc2-46e7-4505-bd1c-6737c2f4948f" config-ref="Salesforce_Config" jobInfoBatch="#[vars.createJobResp]" />
+			<salesforce:close-job doc:name="Close job" doc:id="2c1c5b7d-aee2-443f-a0e8-218316076246" config-ref="Salesforce_Config" jobId="#[vars.createJobResp.id]" />
+		</foreach>
+	</flow>
+	<flow name="bulk-v1-load-11k-SerialProcessing" doc:id="07a1ebc3-c1b6-4faf-a0c0-af75ecfda32c">
+		<file:read doc:name="Read" doc:id="76416235-bb98-4344-8127-af884886f729" path="${input.filePath-10krecords}" />
+		<ee:transform doc:name="Transform Message" doc:id="43bd810d-e73f-441f-9695-ddf0f3d3db5f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map() -> {
+	integrationname__c: $.integrationname__c,
+	integrationid__c: $.integrationid__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="31309c29-b199-4d74-9ee0-609c603f6c1b" batchSize="10000">
+			<salesforce:create-job operation="upsert" type="testbulkobject__c" doc:name="Create job" doc:id="995b7ee3-5dc1-4e20-a118-9bcc35cd6884" config-ref="Salesforce_Config" target="createJobResp">
+				<salesforce:create-job-request><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+    "externalIdFieldName": "integrationid__c",
+    "contentType" : "JSON",
+    "concurrencyMode": "Serial"  //Serial or Parallel
+}]]]></salesforce:create-job-request>
+			</salesforce:create-job>
+			<salesforce:create-batch doc:name="Create batch" doc:id="d97031ff-e480-4c39-8d04-bdbc941449c2" config-ref="Salesforce_Config" jobInfoBatch="#[vars.createJobResp]" />
+			<salesforce:close-job doc:name="Close job" doc:id="5c549e18-96da-4682-a9b7-74d064f42cc2" config-ref="Salesforce_Config" jobId="#[vars.createJobResp.id]" />
+		</foreach>
+	</flow>
+	<flow name="bulk-v2-load-5k" doc:id="7ce76f9c-c4bf-4bf8-b097-b8e6525c2e55">
+		<file:read doc:id="a5a5d32c-eb80-4feb-90df-22c7f57f1255" path="${input.filePath-5krecords}" outputMimeType="application/csv; streaming=true" />
+		<salesforce:create-job-bulk-api-v2 objectType="testbulkobject__c" doc:name="Create job bulk api v 2" doc:id="13fbf12d-27f2-4d94-b616-3cf2f00acdd2" config-ref="Salesforce_Config" operation="upsert" externalIdFieldName="integrationid__c" />
+	</flow>
+	<flow name="bulk-v2-load-11k" doc:id="bb8e96e9-4e8c-40b6-8c8f-8628dd0aa5f1" >
+		<file:read doc:name="Read" doc:id="7ab8b866-d8d8-4745-8c36-c63f7a11dccb" path="${input.filePath-10krecords}" outputMimeType="application/csv; streaming=true" />
+		<salesforce:create-job-bulk-api-v2 objectType="testbulkobject__c" operation="upsert" doc:name="Create job bulk api v 2" doc:id="38b35595-9b3e-4de0-8052-594d11258349" config-ref="Salesforce_Config" externalIdFieldName="integrationid__c" />
+	</flow>
+	<flow name="bulk-v2-load-11k-with-jsoniput" doc:id="b249e807-0bea-42cd-9506-b7ac5eebc77b" >
+		<file:read doc:name="Read" doc:id="22a7667d-e4e6-4b4f-b86a-5a35720f500b" path="${input.filePath-10krecords}" outputMimeType="application/csv; streaming=true" />
+		<ee:transform doc:name="Transform Message" doc:id="18fd4116-bcad-411d-bb2b-bed8b46fae70">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map() -> {
+	integrationname__c: $.integrationname__c,
+	integrationid__c: $.integrationid__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create-job-bulk-api-v2 objectType="testbulkobject__c" operation="upsert" doc:name="Create job bulk api v 2" doc:id="f9db41cf-89de-47c6-b5f7-4586f1c67cd7" config-ref="Salesforce_Config" externalIdFieldName="integrationid__c" >
+			<salesforce:s-objects ><![CDATA[#[%dw 2.0
+output application/csv
+---
+payload]]]></salesforce:s-objects>
+		</salesforce:create-job-bulk-api-v2>
+	</flow>
+</mule>

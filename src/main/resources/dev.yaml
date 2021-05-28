@@ -1,0 +1,10 @@
+salesforce:
+  username: "<<<ADD SF USER>>>>"
+  
+input:
+  filePath-5krecords: "<<<<ADD THE PATH>>>>>/src/main/resources/test-bulk-csv.csv"
+  filePath-10krecords: "<<<<ADD THE PATH>>>>>/src/main/resources/test-bulk-10k.csv"
+  filePath-dependentload-initial: "<<<<ADD THE PATH>>>>>/src/main/resources/test-dependent-initial.csv"
+  filePath-bulk-upsert-relationship: "<<<<ADD THE PATH>>>>>/src/main/resources/test-bulk-upsert-with-relationship.csv"
+  filePath-bulkv2-upsert-relationship: "<<<<ADD THE PATH>>>>>/src/main/resources/test-bulkv2-upsert-relationship.csv"
+  filePath-bulkv2-upsert-relationship-json: "<<<<ADD THE PATH>>>>>/src/main/resources/test-bulkv2-upsert-relationship-json.csv"

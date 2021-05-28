@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="initial-load-helperFlow" doc:id="546691d8-e3ec-4e14-890a-45ee0672a015" >
+		<file:read doc:name="Read" doc:id="dbf4b3d6-f7ef-49ec-b0a4-6b09841b1531" path="${input.filePath-dependentload-initial}" outputMimeType="application/csv; streaming=true"/>
+		<salesforce:create-job-bulk-api-v2 doc:name="Create job bulk api v 2" doc:id="dca0fbf6-797a-4371-92e8-45d04f929774" config-ref="Salesforce_Config" objectType="testbulkdependent__c" operation="insert"/>
+		<logger level="INFO" doc:name="Logger" doc:id="e86b02de-1808-47e9-81c3-641bb74dca66" />
+	</flow>
+</mule>
